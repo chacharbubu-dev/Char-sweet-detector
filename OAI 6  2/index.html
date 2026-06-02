@@ -1,524 +1,7 @@
 <script>
 
-const URL =
-"https://teachablemachine.withgoogle.com/models/N55-y6r3T/";
-
-let model;
-let maxPredictions;
-let labelContainer;
-
-let video;
-let stream;
-
-let predicting = false;
-let currentFacingMode = "user";
-
-const cooldown = {};
-
-let audioCtx =
-new(window.AudioContext ||
-window.webkitAudioContext)();
-
-let modelLoaded = false;
-
-/* ------------------ */
-/* Flower Animation   */
-/* ------------------ */
-
-setInterval(()=>{
-
-const flower =
-document.createElement("div");
-
-flower.className = "petal";
-flower.innerHTML = "🌸";
-
-flower.style.left =
-Math.random()*100+"vw";
-
-flower.style.fontSize =
-(15+Math.random()*20)+"px";
-
-flower.style.animationDuration =
-(5+Math.random()*5)+"s";
-
-document.body.appendChild(flower);
-
-setTimeout(()=>{
-flower.remove();
-},10000);
-
-},500);
-
-/* ------------------ */
-/* Load Page          */
-/* ------------------ */
-
-window.onload = async()=>{
-
-try{
-
-loadHistory();
-
-await setupCamera();
-
-await loadModel();
-
-console.log(
-"Sweet AI Ready"
-);
-
-}catch(error){
-
-console.error(
-error
-);
-
-alert(
-"เกิดข้อผิดพลาดในการโหลดระบบ"
-);
-
-}
-
-};
-
-/* ------------------ */
-/* Camera             */
-/* ------------------ */
-
-async function setupCamera(){
-
-if(stream){
-
-stream.getTracks()
-.forEach(track=>track.stop());
-
-}
-
-stream =
-await navigator.mediaDevices
-.getUserMedia({
-
-video:{
-facingMode:currentFacingMode,
-width:{ideal:320},
-height:{ideal:320}
-},
-
-audio:false
-
-});
-
-video =
-document.getElementById(
-"webcam"
-);
-
-video.srcObject =
-stream;
-
-await video.play();
-
-console.log(
-"CAMERA READY"
-);
-
-}
-
-/* ------------------ */
-/* Switch Camera      */
-/* ------------------ */
-
-async function switchCamera(){
-
-const wasRunning =
-predicting;
-
-predicting = false;
-
-currentFacingMode =
-
-currentFacingMode === "user"
-
-?
-
-"environment"
-
-:
-
-"user";
-
-await setupCamera();
-
-if(wasRunning){
-
-predicting = true;
-
-predictLoop();
-
-}
-
-}
-
-/* ------------------ */
-/* Load Model         */
-/* ------------------ */
-
-async function loadModel(){
-
-const modelURL =
-URL + "model.json";
-
-const metadataURL =
-URL + "metadata.json";
-
-model =
-await tmImage.load(
-modelURL,
-metadataURL
-);
-
-console.log(
-"MODEL LOADED"
-);
-
-modelLoaded = true;
-
-maxPredictions =
-model.getTotalClasses();
-
-labelContainer =
-document.getElementById(
-"label-container"
-);
-
-labelContainer.innerHTML="";
-
-for(
-let i=0;
-i<maxPredictions;
-i++
-){
-
-const div =
-document.createElement(
-"div"
-);
-
-div.className =
-"prediction";
-
-labelContainer
-.appendChild(div);
-
-}
-
-}
-
-/* ------------------ */
-/* Start Stop         */
-/* ------------------ */
-
-function startPredict(){
-
-if(!modelLoaded){
-
-alert(
-"กำลังโหลดโมเดล..."
-);
-
-return;
-
-}
-
-if(!predicting){
-
-predicting = true;
-
-predictLoop();
-
-}
-
-}
-
-function stopPredict(){
-
-predicting = false;
-
-}
-
-/* ------------------ */
-/* Predict Loop       */
-/* ------------------ */
-
-async function predictLoop(){
-
-if(!predicting)
-return;
-
-await predict();
-
-setTimeout(
-predictLoop,
-100
-);
-
-}
-
-/* ------------------ */
-/* Predict            */
-/* ------------------ */
-
-async function predict(){
-
-if(!model)return;
-
-const prediction =
-await model.predict(
-video
-);
-
-let highest =
-prediction[0];
-
-for(
-let i=0;
-i<prediction.length;
-i++
-){
-
-const p =
-prediction[i];
-
-labelContainer
-.childNodes[i]
-.innerHTML =
-
-`${p.className}
-:
-${(p.probability*100)
-.toFixed(1)}%`;
-
-if(
-p.probability >
-highest.probability
-){
-
-highest = p;
-
-}
-
-}
-
-if(
-highest.probability > 0.80
-){
-
-const now =
-Date.now();
-
-if(
-
-!cooldown[
-highest.className
-]
-
-||
-
-now -
-cooldown[
-highest.className
-]
-
->
-
-10000
-
-){
-
-cooldown[
-highest.className
-] = now;
-
-beep();
-
-saveHistory(
-highest.className
-);
-
-}
-
-}
-
-}
-
-/* ------------------ */
-/* Beep Sound         */
-/* ------------------ */
-
-function beep(){
-
-try{
-
-const osc =
-audioCtx
-.createOscillator();
-
-const gain =
-audioCtx
-.createGain();
-
-osc.type =
-"sine";
-
-osc.frequency.value =
-1200;
-
-gain.gain.value =
-0.05;
-
-osc.connect(gain);
-
-gain.connect(
-audioCtx.destination
-);
-
-osc.start();
-
-setTimeout(()=>{
-osc.stop();
-},100);
-
-}catch(error){
-
-console.log(error);
-
-}
-
-}
-
-/* ------------------ */
-/* Save History       */
-/* ------------------ */
-
-function saveHistory(
-className
-){
-
-const canvas =
-document.createElement(
-"canvas"
-);
-
-canvas.width =
-video.videoWidth;
-
-canvas.height =
-video.videoHeight;
-
-const ctx =
-canvas.getContext(
-"2d"
-);
-
-ctx.drawImage(
-video,
-0,
-0
-);
-
-const image =
-canvas.toDataURL(
-"image/png"
-);
-
-const time =
-new Date()
-.toLocaleString(
-"th-TH"
-);
-
-const history =
-document.getElementById(
-"history"
-);
-
-const card =
-document.createElement(
-"div"
-);
-
-card.className =
-"history-card";
-
-card.innerHTML =
-
-`
-<img src="${image}">
-<div class="class-title">
-${className}
-</div>
-<div class="time">
-${time}
-</div>
-`;
-
-history.prepend(card);
-
-localStorage.setItem(
-"historyData",
-history.innerHTML
-);
-
-}
-
-/* ------------------ */
-/* Load History       */
-/* ------------------ */
-
-function loadHistory(){
-
-const data =
-localStorage.getItem(
-"historyData"
-);
-
-if(data){
-
-document
-.getElementById(
-"history"
-)
-.innerHTML =
-data;
-
-}
-
-}
-
-/* ------------------ */
-/* Clear History      */
-/* ------------------ */
-
-function clearHistory(){
-
-localStorage.removeItem(
-"historyData"
-);
-
-document
-.getElementById(
-"history"
-)
-.innerHTML =
-"";
-
-}
-
-</script>
-<script>
-
-const URL = "https://teachablemachine.withgoogle.com/models/N55-y6r3T/";
+// 🌟 แก้ไข: เปลี่ยนชื่อตัวแปรเพื่อไม่ให้ชนกับระบบอื่น (แก้บั๊ก Identifier 'URL' has already been declared)
+const tmModelURL = "https://teachablemachine.withgoogle.com/models/N55-y6r3T/";
 
 let model;
 let maxPredictions;
@@ -560,13 +43,9 @@ setInterval(() => {
 
 window.onload = async () => {
     try {
-        // โหลดประวัติเก่าก่อน
         loadHistory();
-        // ตั้งค่ากล้อง
         await setupCamera();
-        // โหลด AI Model
         await loadModel();
-
         console.log("Sweet AI Ready");
     } catch (error) {
         console.error(error);
@@ -583,26 +62,30 @@ async function setupCamera() {
         stream.getTracks().forEach(track => track.stop());
     }
 
-    stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-            facingMode: currentFacingMode,
-            width: { ideal: 320 },
-            height: { ideal: 320 }
-        },
-        audio: false
-    });
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: currentFacingMode,
+                width: { ideal: 320 },
+                height: { ideal: 320 }
+            },
+            audio: false
+        });
 
-    video = document.getElementById("webcam");
-    
-    // 🌟 แก้ไข: เช็กว่ามีแท็ก <video id="webcam"> ไหมก่อนจะสั่งเล่น
-    if (!video) {
-        console.warn("ไม่พบ Element id='webcam' บนหน้า HTML");
-        return;
+        video = document.getElementById("webcam");
+        
+        // 🌟 แก้ไข: เช็กความปลอดภัยถ้าไม่มีแท็กวีดีโอ จะได้ไม่พ่น Error
+        if (!video) {
+            console.warn("ไม่พบ Element id='webcam' บนหน้าเว็บของคุณ");
+            return;
+        }
+
+        video.srcObject = stream;
+        await video.play();
+        console.log("CAMERA READY");
+    } catch (err) {
+        console.error("ไม่สามารถเข้าถึงกล้องได้:", err);
     }
-
-    video.srcObject = stream;
-    await video.play();
-    console.log("CAMERA READY");
 }
 
 /* ------------------ */
@@ -612,7 +95,6 @@ async function setupCamera() {
 async function switchCamera() {
     const wasRunning = predicting;
     predicting = false;
-
     currentFacingMode = currentFacingMode === "user" ? "environment" : "user";
 
     await setupCamera();
@@ -628,8 +110,14 @@ async function switchCamera() {
 /* ------------------ */
 
 async function loadModel() {
-    const modelURL = URL + "model.json";
-    const metadataURL = URL + "metadata.json";
+    // 🌟 แก้ไข: เรียกใช้ตัวแปรใหม่ที่เปลี่ยนชื่อแล้ว
+    const modelURL = tmModelURL + "model.json";
+    const metadataURL = tmModelURL + "metadata.json";
+
+    if (typeof tmImage === "undefined") {
+        console.error("ไม่พบ Library ของ Teachable Machine กรุณาเช็กว่าใส่สคริปต์ใน <head> ครบไหม");
+        return;
+    }
 
     model = await tmImage.load(modelURL, metadataURL);
     console.log("MODEL LOADED");
@@ -638,9 +126,8 @@ async function loadModel() {
     maxPredictions = model.getTotalClasses();
     labelContainer = document.getElementById("label-container");
 
-    // 🌟 แก้ไข: ถ้าไม่มี id="label-container" ให้ข้ามการสร้างกล่องข้อความไปเลย ไม่ให้โค้ดบึ้ม
     if (!labelContainer) {
-        console.warn("ไม่พบ Element id='label-container' บนหน้า HTML");
+        console.warn("ไม่พบ Element id='label-container'");
         return;
     }
 
@@ -687,7 +174,7 @@ async function predictLoop() {
 /* ------------------ */
 
 async function predict() {
-    if (!model || !video) return;
+    if (!model || !video || !video.srcObject) return;
 
     const prediction = await model.predict(video);
     let highest = prediction[0];
@@ -695,7 +182,7 @@ async function predict() {
     for (let i = 0; i < prediction.length; i++) {
         const p = prediction[i];
 
-        // 🌟 แก้ไข: เช็กก่อนว่ามีกล่องแสดงผลลัพธ์ย่อยๆ ค่อยใส่ข้อความเปอร์เซ็นต์เข้าไป
+        // 🌟 แก้ไข: เช็กความปลอดภัยก่อนแสดงเปอร์เซ็นต์
         if (labelContainer && labelContainer.childNodes[i]) {
             labelContainer.childNodes[i].innerHTML = `${p.className} : ${(p.probability * 100).toFixed(1)}%`;
         }
@@ -721,83 +208,4 @@ async function predict() {
 
 function beep() {
     try {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-
-        osc.type = "sine";
-        osc.frequency.value = 1200;
-        gain.gain.value = 0.05;
-
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-
-        osc.start();
-        setTimeout(() => { osc.stop(); }, 100);
-    } catch (error) {
-        console.log(error);
-    }
-}
-
-/* ------------------ */
-/* Save History       */
-/* ------------------ */
-
-function saveHistory(className) {
-    if (!video) return;
-
-    const history = document.getElementById("history");
-    // 🌟 แก้ไข: ถ้าในหน้าเว็บไม่มีที่เก็บประวัติ ให้ข้ามการเซฟไป ไม่ให้เกิด Error
-    if (!history) {
-        console.warn("ไม่พบ Element id='history' ไม่สามารถบันทึกประวัติลงหน้าเว็บได้");
-        return;
-    }
-
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(video, 0, 0);
-
-    const image = canvas.toDataURL("image/png");
-    const time = new Date().toLocaleString("th-TH");
-
-    const card = document.createElement("div");
-    card.className = "history-card";
-    card.innerHTML = `
-        <img src="${image}">
-        <div class="class-title">${className}</div>
-        <div class="time">${time}</div>
-    `;
-
-    history.prepend(card);
-    localStorage.setItem("historyData", history.innerHTML);
-}
-
-/* ------------------ */
-/* Load History       */
-/* ------------------ */
-
-function loadHistory() {
-    const data = localStorage.getItem("historyData");
-    const history = document.getElementById("history");
-    
-    // 🌟 แก้ไขจุดสำคัญ: เช็กตัวแปร history ว่าเป็น null หรือไม่ ก่อนที่จะยัดข้อมูลลงไป (แก้บั๊ก Cannot set properties of null)
-    if (history && data) {
-        history.innerHTML = data;
-    }
-}
-
-/* ------------------ */
-/* Clear History      */
-/* ------------------ */
-
-function clearHistory() {
-    localStorage.removeItem("historyData");
-    const history = document.getElementById("history");
-    if (history) {
-        history.innerHTML = "";
-    }
-}
-
-</script>
+        if (audioCtx.state === 'suspended') {
