@@ -1,293 +1,3 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>🌸 Sweet AI Detector</title>
-
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
-
-<style>
-
-*{
-margin:0;
-padding:0;
-box-sizing:border-box;
-font-family:'Segoe UI',sans-serif;
-}
-
-body{
-background:linear-gradient(135deg,#fff8fb,#ffe7f1);
-min-height:100vh;
-overflow-x:hidden;
-}
-
-.container{
-max-width:1300px;
-margin:auto;
-padding:30px;
-position:relative;
-z-index:2;
-}
-
-.main-card{
-background:white;
-border-radius:30px;
-padding:25px;
-box-shadow:0 10px 30px rgba(255,150,200,.25);
-}
-
-.title{
-text-align:center;
-font-size:2rem;
-font-weight:bold;
-color:#ff6fa7;
-margin-bottom:20px;
-}
-
-.content{
-display:flex;
-gap:25px;
-}
-
-.camera-section{
-flex:1;
-}
-
-.history-section{
-width:350px;
-background:#fff7fa;
-border-radius:20px;
-padding:15px;
-max-height:800px;
-overflow:auto;
-}
-
-.history-section h3{
-color:#ff6fa7;
-margin-bottom:15px;
-}
-
-#webcam-container{
-display:flex;
-justify-content:center;
-}
-
-#webcam{
-width:100%;
-max-width:420px;
-height:420px;
-object-fit:cover;
-border-radius:25px;
-border:6px solid #ffd4e6;
-box-shadow:0 8px 20px rgba(0,0,0,.08);
-}
-
-.btn-group{
-display:flex;
-justify-content:center;
-gap:10px;
-margin-top:15px;
-flex-wrap:wrap;
-}
-
-button{
-border:none;
-padding:12px 22px;
-border-radius:50px;
-cursor:pointer;
-font-size:15px;
-transition:.3s;
-}
-
-button:hover{
-transform:translateY(-3px);
-}
-
-.start-btn{
-background:#ff7db4;
-color:white;
-}
-
-.stop-btn{
-background:#ffd8e8;
-}
-
-.switch-btn{
-background:#ffc7dd;
-}
-
-.clear-btn{
-background:#ffe7ef;
-}
-
-#label-container{
-margin-top:20px;
-}
-
-.prediction{
-background:#fff5f9;
-padding:10px;
-border-radius:12px;
-margin-bottom:8px;
-}
-
-.history-card{
-background:white;
-border-radius:15px;
-padding:10px;
-margin-bottom:12px;
-box-shadow:0 4px 10px rgba(0,0,0,.05);
-}
-
-.history-card img{
-width:100%;
-border-radius:12px;
-}
-
-.class-title{
-font-weight:bold;
-color:#ff6fa7;
-margin-top:8px;
-}
-
-.time{
-font-size:12px;
-color:#777;
-}
-
-.floating{
-position:fixed;
-font-size:55px;
-pointer-events:none;
-animation:float 3s ease-in-out infinite;
-z-index:1;
-}
-
-.bunny{
-top:20px;
-left:20px;
-}
-
-.bear{
-bottom:20px;
-right:20px;
-}
-
-.ribbon{
-top:20px;
-right:20px;
-}
-
-@keyframes float{
-50%{
-transform:translateY(-10px);
-}
-}
-
-.petal{
-position:fixed;
-top:-50px;
-pointer-events:none;
-animation:fall linear forwards;
-z-index:0;
-}
-
-@keyframes fall{
-from{
-transform:translateY(-50px) rotate(0deg);
-}
-to{
-transform:translateY(110vh) rotate(360deg);
-opacity:0;
-}
-}
-
-@media(max-width:900px){
-
-.content{
-flex-direction:column;
-}
-
-.history-section{
-width:100%;
-}
-
-#webcam{
-height:320px;
-}
-
-}
-
-</style>
-</head>
-<body>
-
-<div class="floating bunny">🐰</div>
-<div class="floating bear">🧸</div>
-<div class="floating ribbon">🎀</div>
-
-<div class="container">
-
-<div class="main-card">
-
-<div class="title">
-🌸 Sweet AI Detector 🌸
-</div>
-
-<div class="content">
-
-<div class="camera-section">
-
-<div id="webcam-container">
-<video
-id="webcam"
-autoplay
-playsinline
-muted>
-</video>
-</div>
-
-<div class="btn-group">
-
-<button class="start-btn" onclick="startPredict()">
-▶ Start
-</button>
-
-<button class="stop-btn" onclick="stopPredict()">
-⏹ Stop
-</button>
-
-<button class="switch-btn" onclick="switchCamera()">
-🔄 กล้อง
-</button>
-
-<button class="clear-btn" onclick="clearHistory()">
-🗑 ล้างประวัติ
-</button>
-
-</div>
-
-<div id="label-container"></div>
-
-</div>
-
-<div class="history-section">
-
-<h3>📷 Detection History</h3>
-
-<div id="history"></div>
-
-</div>
-
-</div>
-
-</div>
-
-</div>
-
 <script>
 
 const URL =
@@ -300,22 +10,37 @@ let labelContainer;
 let video;
 let stream;
 
-let predicting=false;
+let predicting = false;
+let currentFacingMode = "user";
 
-let currentFacingMode="user";
+const cooldown = {};
 
-const cooldown={};
+let audioCtx =
+new(window.AudioContext ||
+window.webkitAudioContext)();
+
+let modelLoaded = false;
+
+/* ------------------ */
+/* Flower Animation   */
+/* ------------------ */
 
 setInterval(()=>{
 
-const flower=document.createElement("div");
+const flower =
+document.createElement("div");
 
-flower.className="petal";
-flower.innerHTML="🌸";
+flower.className = "petal";
+flower.innerHTML = "🌸";
 
-flower.style.left=Math.random()*100+"vw";
-flower.style.fontSize=(15+Math.random()*20)+"px";
-flower.style.animationDuration=(5+Math.random()*5)+"s";
+flower.style.left =
+Math.random()*100+"vw";
+
+flower.style.fontSize =
+(15+Math.random()*20)+"px";
+
+flower.style.animationDuration =
+(5+Math.random()*5)+"s";
 
 document.body.appendChild(flower);
 
@@ -325,7 +50,19 @@ flower.remove();
 
 },500);
 
-window.onload=async()=>{
+/* ------------------ */
+/* Load Page          */
+/* ------------------ */
+
+window.onload = async()=>{
+
+await tf.setBackend("webgl");
+await tf.ready();
+
+console.log(
+"TensorFlow Backend:",
+tf.getBackend()
+);
 
 loadHistory();
 
@@ -335,21 +72,38 @@ await loadModel();
 
 };
 
+/* ------------------ */
+/* Camera             */
+/* ------------------ */
+
 async function setupCamera(){
 
 if(stream){
-stream.getTracks().forEach(track=>track.stop());
+
+stream.getTracks().forEach(
+track=>track.stop()
+);
+
 }
 
-stream=await navigator.mediaDevices.getUserMedia({
+stream =
+await navigator.mediaDevices.getUserMedia({
+
 video:{
-facingMode:currentFacingMode
+facingMode:currentFacingMode,
+width:{ideal:224},
+height:{ideal:224}
 }
+
 });
 
-video=document.getElementById("webcam");
+video =
+document.getElementById(
+"webcam"
+);
 
-video.srcObject=stream;
+video.srcObject =
+stream;
 
 await video.play();
 
@@ -357,52 +111,101 @@ await video.play();
 
 async function switchCamera(){
 
-currentFacingMode=
-currentFacingMode==="user"
-?
-"environment"
-:
-"user";
+const wasRunning =
+predicting;
+
+predicting = false;
+
+currentFacingMode =
+
+currentFacingMode === "user"
+
+? "environment"
+
+: "user";
 
 await setupCamera();
 
+if(wasRunning){
+
+predicting = true;
+
+predictLoop();
+
 }
+
+}
+
+/* ------------------ */
+/* Load Model         */
+/* ------------------ */
 
 async function loadModel(){
 
-const modelURL=URL+"model.json";
-const metadataURL=URL+"metadata.json";
+const modelURL =
+URL + "model.json";
 
-model=
+const metadataURL =
+URL + "metadata.json";
+
+model =
 await tmImage.load(
 modelURL,
 metadataURL
 );
 
-maxPredictions=
+modelLoaded = true;
+
+maxPredictions =
 model.getTotalClasses();
 
-labelContainer=
-document.getElementById("label-container");
+labelContainer =
+document.getElementById(
+"label-container"
+);
 
-for(let i=0;i<maxPredictions;i++){
+labelContainer.innerHTML = "";
 
-const div=
-document.createElement("div");
+for(
+let i=0;
+i<maxPredictions;
+i++
+){
 
-div.className="prediction";
+const div =
+document.createElement(
+"div"
+);
 
-labelContainer.appendChild(div);
+div.className =
+"prediction";
+
+labelContainer
+.appendChild(div);
 
 }
 
 }
+
+/* ------------------ */
+/* Start / Stop       */
+/* ------------------ */
 
 function startPredict(){
 
+if(!modelLoaded){
+
+alert(
+"กำลังโหลดโมเดล..."
+);
+
+return;
+
+}
+
 if(!predicting){
 
-predicting=true;
+predicting = true;
 
 predictLoop();
 
@@ -412,56 +215,98 @@ predictLoop();
 
 function stopPredict(){
 
-predicting=false;
+predicting = false;
 
 }
 
+/* ------------------ */
+/* Predict Loop       */
+/* ------------------ */
+
 async function predictLoop(){
 
-if(!predicting)return;
+if(!predicting)
+return;
 
 await predict();
 
-requestAnimationFrame(
-predictLoop
+setTimeout(
+predictLoop,
+80
 );
 
 }
 
+/* ------------------ */
+/* Predict            */
+/* ------------------ */
+
 async function predict(){
 
-const prediction=
-await model.predict(video);
+const prediction =
+await model.predict(
+video
+);
 
-let highest=prediction[0];
+let highest =
+prediction[0];
 
-for(let i=0;i<prediction.length;i++){
+for(
+let i=0;
+i<prediction.length;
+i++
+){
 
-const p=prediction[i];
+const p =
+prediction[i];
 
-labelContainer.childNodes[i].innerHTML=
-`${p.className} : ${(p.probability*100).toFixed(1)}%`;
+labelContainer
+.childNodes[i]
+.innerHTML =
+
+`${p.className}
+:
+${(p.probability*100)
+.toFixed(1)}%`;
 
 if(
-p.probability>
+p.probability >
 highest.probability
 ){
-highest=p;
+highest = p;
 }
 
 }
-
-if(highest.probability>0.90){
-
-const now=Date.now();
 
 if(
-!cooldown[highest.className]
-||
-now-cooldown[highest.className]>5000
+highest.probability > 0.80
 ){
 
-cooldown[highest.className]=now;
+const now =
+Date.now();
+
+if(
+
+!cooldown[
+highest.className
+]
+
+||
+
+now -
+cooldown[
+highest.className
+]
+
+>
+
+10000
+
+){
+
+cooldown[
+highest.className
+] = now;
 
 beep();
 
@@ -475,41 +320,70 @@ highest.className
 
 }
 
+/* ------------------ */
+/* Beep Sound         */
+/* ------------------ */
+
 function beep(){
 
-const ctx=
-new(window.AudioContext||
-window.webkitAudioContext)();
+const osc =
+audioCtx
+.createOscillator();
 
-const osc=
-ctx.createOscillator();
+const gain =
+audioCtx
+.createGain();
 
-osc.type="sine";
-osc.frequency.value=1200;
+osc.type =
+"sine";
 
-osc.connect(ctx.destination);
+osc.frequency.value =
+1200;
+
+gain.gain.value =
+0.08;
+
+osc.connect(
+gain
+);
+
+gain.connect(
+audioCtx.destination
+);
 
 osc.start();
 
 setTimeout(()=>{
+
 osc.stop();
-},150);
+
+},100);
 
 }
 
-function saveHistory(className){
+/* ------------------ */
+/* Save History       */
+/* ------------------ */
 
-const canvas=
-document.createElement("canvas");
+function saveHistory(
+className
+){
 
-canvas.width=
+const canvas =
+document.createElement(
+"canvas"
+);
+
+canvas.width =
 video.videoWidth;
 
-canvas.height=
+canvas.height =
 video.videoHeight;
 
-const ctx=
-canvas.getContext("2d");
+const ctx =
+canvas.getContext(
+"2d"
+);
 
 ctx.drawImage(
 video,
@@ -517,33 +391,40 @@ video,
 0
 );
 
-const image=
+const image =
 canvas.toDataURL(
 "image/png"
 );
 
-const time=
+const time =
 new Date()
-.toLocaleString("th-TH");
+.toLocaleString(
+"th-TH"
+);
 
-const history=
+const history =
 document.getElementById(
 "history"
 );
 
-const card=
+const card =
 document.createElement(
 "div"
 );
 
-card.className=
+card.className =
 "history-card";
 
-card.innerHTML=
+card.innerHTML =
+
 `
 <img src="${image}">
-<div class="class-title">${className}</div>
-<div class="time">${time}</div>
+<div class="class-title">
+${className}
+</div>
+<div class="time">
+${time}
+</div>
 `;
 
 history.prepend(card);
@@ -555,22 +436,33 @@ history.innerHTML
 
 }
 
+/* ------------------ */
+/* Load History       */
+/* ------------------ */
+
 function loadHistory(){
 
-const data=
+const data =
 localStorage.getItem(
 "historyData"
 );
 
 if(data){
 
-document.getElementById(
+document
+.getElementById(
 "history"
-).innerHTML=data;
+)
+.innerHTML =
+data;
 
 }
 
 }
+
+/* ------------------ */
+/* Clear History      */
+/* ------------------ */
 
 function clearHistory(){
 
@@ -578,13 +470,12 @@ localStorage.removeItem(
 "historyData"
 );
 
-document.getElementById(
+document
+.getElementById(
 "history"
-).innerHTML="";
+)
+.innerHTML = "";
 
 }
 
 </script>
-
-</body>
-</html>
