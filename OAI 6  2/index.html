@@ -56,19 +56,29 @@ flower.remove();
 
 window.onload = async()=>{
 
-await tf.setBackend("webgl");
-await tf.ready();
-
-console.log(
-"TensorFlow Backend:",
-tf.getBackend()
-);
+try{
 
 loadHistory();
 
 await setupCamera();
 
 await loadModel();
+
+console.log(
+"Sweet AI Ready"
+);
+
+}catch(error){
+
+console.error(
+error
+);
+
+alert(
+"เกิดข้อผิดพลาดในการโหลดระบบ"
+);
+
+}
 
 };
 
@@ -80,20 +90,22 @@ async function setupCamera(){
 
 if(stream){
 
-stream.getTracks().forEach(
-track=>track.stop()
-);
+stream.getTracks()
+.forEach(track=>track.stop());
 
 }
 
 stream =
-await navigator.mediaDevices.getUserMedia({
+await navigator.mediaDevices
+.getUserMedia({
 
 video:{
 facingMode:currentFacingMode,
-width:{ideal:224},
-height:{ideal:224}
-}
+width:{ideal:320},
+height:{ideal:320}
+},
+
+audio:false
 
 });
 
@@ -107,7 +119,15 @@ stream;
 
 await video.play();
 
+console.log(
+"CAMERA READY"
+);
+
 }
+
+/* ------------------ */
+/* Switch Camera      */
+/* ------------------ */
 
 async function switchCamera(){
 
@@ -120,9 +140,13 @@ currentFacingMode =
 
 currentFacingMode === "user"
 
-? "environment"
+?
 
-: "user";
+"environment"
+
+:
+
+"user";
 
 await setupCamera();
 
@@ -154,6 +178,10 @@ modelURL,
 metadataURL
 );
 
+console.log(
+"MODEL LOADED"
+);
+
 modelLoaded = true;
 
 maxPredictions =
@@ -164,7 +192,7 @@ document.getElementById(
 "label-container"
 );
 
-labelContainer.innerHTML = "";
+labelContainer.innerHTML="";
 
 for(
 let i=0;
@@ -188,7 +216,7 @@ labelContainer
 }
 
 /* ------------------ */
-/* Start / Stop       */
+/* Start Stop         */
 /* ------------------ */
 
 function startPredict(){
@@ -232,7 +260,7 @@ await predict();
 
 setTimeout(
 predictLoop,
-80
+100
 );
 
 }
@@ -242,6 +270,8 @@ predictLoop,
 /* ------------------ */
 
 async function predict(){
+
+if(!model)return;
 
 const prediction =
 await model.predict(
@@ -273,7 +303,9 @@ if(
 p.probability >
 highest.probability
 ){
+
 highest = p;
+
 }
 
 }
@@ -326,6 +358,8 @@ highest.className
 
 function beep(){
 
+try{
+
 const osc =
 audioCtx
 .createOscillator();
@@ -341,11 +375,9 @@ osc.frequency.value =
 1200;
 
 gain.gain.value =
-0.08;
+0.05;
 
-osc.connect(
-gain
-);
+osc.connect(gain);
 
 gain.connect(
 audioCtx.destination
@@ -354,10 +386,14 @@ audioCtx.destination
 osc.start();
 
 setTimeout(()=>{
-
 osc.stop();
-
 },100);
+
+}catch(error){
+
+console.log(error);
+
+}
 
 }
 
@@ -474,7 +510,8 @@ document
 .getElementById(
 "history"
 )
-.innerHTML = "";
+.innerHTML =
+"";
 
 }
 
