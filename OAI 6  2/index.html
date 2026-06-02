@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>🌸 Sweet AI Detector</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+
+<style>
+
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:'Segoe UI',sans-serif;
+}
+
+body{
+background:linear-gradient(135deg,#fff8fb,#ffe7f1);
+min-height:100vh;
+overflow-x:hidden;
+}
+
+.container{
+max-width:1300px;
+margin:auto;
+padding:30px;
+position:relative;
+z-index:2;
+}
+
+.main-card{
+background:white;
+border-radius:30px;
+padding:25px;
+box-shadow:0 10px 30px rgba(255,150,200,.25);
+}
+
+.title{
+text-align:center;
+font-size:2rem;
+font-weight:bold;
+color:#ff6fa7;
+margin-bottom:20px;
+}
+
+.content{
+display:flex;
+gap:25px;
+}
+
+.camera-section{
+flex:1;
+}
+
+.history-section{
+width:350px;
+background:#fff7fa;
+border-radius:20px;
+padding:15px;
+max-height:800px;
+overflow:auto;
+}
+
+.history-section h3{
+color:#ff6fa7;
+margin-bottom:15px;
+}
+
+#webcam-container{
+display:flex;
+justify-content:center;
+}
+
+#webcam{
+width:100%;
+max-width:420px;
+height:420px;
+object-fit:cover;
+border-radius:25px;
+border:6px solid #ffd4e6;
+box-shadow:0 8px 20px rgba(0,0,0,.08);
+}
+
+.btn-group{
+display:flex;
+justify-content:center;
+gap:10px;
+margin-top:15px;
+flex-wrap:wrap;
+}
+
+button{
+border:none;
+padding:12px 22px;
+border-radius:50px;
+cursor:pointer;
+font-size:15px;
+transition:.3s;
+}
+
+button:hover{
+transform:translateY(-3px);
+}
+
+.start-btn{
+background:#ff7db4;
+color:white;
+}
+
+.stop-btn{
+background:#ffd8e8;
+}
+
+.switch-btn{
+background:#ffc7dd;
+}
+
+.clear-btn{
+background:#ffe7ef;
+}
+
+#label-container{
+margin-top:20px;
+}
+
+.prediction{
+background:#fff5f9;
+padding:10px;
+border-radius:12px;
+margin-bottom:8px;
+}
+
+.history-card{
+background:white;
+border-radius:15px;
+padding:10px;
+margin-bottom:12px;
+box-shadow:0 4px 10px rgba(0,0,0,.05);
+}
+
+.history-card img{
+width:100%;
+border-radius:12px;
+}
+
+.class-title{
+font-weight:bold;
+color:#ff6fa7;
+margin-top:8px;
+}
+
+.time{
+font-size:12px;
+color:#777;
+}
+
+.floating{
+position:fixed;
+font-size:55px;
+pointer-events:none;
+animation:float 3s ease-in-out infinite;
+z-index:1;
+}
+
+.bunny{
+top:20px;
+left:20px;
+}
+
+.bear{
+bottom:20px;
+right:20px;
+}
+
+.ribbon{
+top:20px;
+right:20px;
+}
+
+@keyframes float{
+50%{
+transform:translateY(-10px);
+}
+}
+
+.petal{
+position:fixed;
+top:-50px;
+pointer-events:none;
+animation:fall linear forwards;
+z-index:0;
+}
+
+@keyframes fall{
+from{
+transform:translateY(-50px) rotate(0deg);
+}
+to{
+transform:translateY(110vh) rotate(360deg);
+opacity:0;
+}
+}
+
+@media(max-width:900px){
+
+.content{
+flex-direction:column;
+}
+
+.history-section{
+width:100%;
+}
+
+#webcam{
+height:320px;
+}
+
+}
+
+</style>
+</head>
+<body>
+
+<div class="floating bunny">🐰</div>
+<div class="floating bear">🧸</div>
+<div class="floating ribbon">🎀</div>
+
+<div class="container">
+
+<div class="main-card">
+
+<div class="title">
+🌸 Sweet AI Detector 🌸
+</div>
+
+<div class="content">
+
+<div class="camera-section">
+
+<div id="webcam-container">
+<video
+id="webcam"
+autoplay
+playsinline
+muted>
+</video>
+</div>
+
+<div class="btn-group">
+
+<button class="start-btn" onclick="startPredict()">
+▶ Start
+</button>
+
+<button class="stop-btn" onclick="stopPredict()">
+⏹ Stop
+</button>
+
+<button class="switch-btn" onclick="switchCamera()">
+🔄 กล้อง
+</button>
+
+<button class="clear-btn" onclick="clearHistory()">
+🗑 ล้างประวัติ
+</button>
+
+</div>
+
+<div id="label-container"></div>
+
+</div>
+
+<div class="history-section">
+
+<h3>📷 Detection History</h3>
+
+<div id="history"></div>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+<script>
+
+const URL =
+"https://teachablemachine.withgoogle.com/models/N55-y6r3T/";
+
+let model;
+let maxPredictions;
+let labelContainer;
+
+let video;
+let stream;
+
+let predicting=false;
+
+let currentFacingMode="user";
+
+const cooldown={};
+
+setInterval(()=>{
+
+const flower=document.createElement("div");
+
+flower.className="petal";
+flower.innerHTML="🌸";
+
+flower.style.left=Math.random()*100+"vw";
+flower.style.fontSize=(15+Math.random()*20)+"px";
+flower.style.animationDuration=(5+Math.random()*5)+"s";
+
+document.body.appendChild(flower);
+
+setTimeout(()=>{
+flower.remove();
+},10000);
+
+},500);
+
+window.onload=async()=>{
+
+loadHistory();
+
+await setupCamera();
+
+await loadModel();
+
+};
+
+async function setupCamera(){
+
+if(stream){
+stream.getTracks().forEach(track=>track.stop());
+}
+
+stream=await navigator.mediaDevices.getUserMedia({
+video:{
+facingMode:currentFacingMode
+}
+});
+
+video=document.getElementById("webcam");
+
+video.srcObject=stream;
+
+await video.play();
+
+}
+
+async function switchCamera(){
+
+currentFacingMode=
+currentFacingMode==="user"
+?
+"environment"
+:
+"user";
+
+await setupCamera();
+
+}
+
+async function loadModel(){
+
+const modelURL=URL+"model.json";
+const metadataURL=URL+"metadata.json";
+
+model=
+await tmImage.load(
+modelURL,
+metadataURL
+);
+
+maxPredictions=
+model.getTotalClasses();
+
+labelContainer=
+document.getElementById("label-container");
+
+for(let i=0;i<maxPredictions;i++){
+
+const div=
+document.createElement("div");
+
+div.className="prediction";
+
+labelContainer.appendChild(div);
+
+}
+
+}
+
+function startPredict(){
+
+if(!predicting){
+
+predicting=true;
+
+predictLoop();
+
+}
+
+}
+
+function stopPredict(){
+
+predicting=false;
+
+}
+
+async function predictLoop(){
+
+if(!predicting)return;
+
+await predict();
+
+requestAnimationFrame(
+predictLoop
+);
+
+}
+
+async function predict(){
+
+const prediction=
+await model.predict(video);
+
+let highest=prediction[0];
+
+for(let i=0;i<prediction.length;i++){
+
+const p=prediction[i];
+
+labelContainer.childNodes[i].innerHTML=
+`${p.className} : ${(p.probability*100).toFixed(1)}%`;
+
+if(
+p.probability>
+highest.probability
+){
+highest=p;
+}
+
+}
+
+if(highest.probability>0.90){
+
+const now=Date.now();
+
+if(
+!cooldown[highest.className]
+||
+now-cooldown[highest.className]>5000
+){
+
+cooldown[highest.className]=now;
+
+beep();
+
+saveHistory(
+highest.className
+);
+
+}
+
+}
+
+}
+
+function beep(){
+
+const ctx=
+new(window.AudioContext||
+window.webkitAudioContext)();
+
+const osc=
+ctx.createOscillator();
+
+osc.type="sine";
+osc.frequency.value=1200;
+
+osc.connect(ctx.destination);
+
+osc.start();
+
+setTimeout(()=>{
+osc.stop();
+},150);
+
+}
+
+function saveHistory(className){
+
+const canvas=
+document.createElement("canvas");
+
+canvas.width=
+video.videoWidth;
+
+canvas.height=
+video.videoHeight;
+
+const ctx=
+canvas.getContext("2d");
+
+ctx.drawImage(
+video,
+0,
+0
+);
+
+const image=
+canvas.toDataURL(
+"image/png"
+);
+
+const time=
+new Date()
+.toLocaleString("th-TH");
+
+const history=
+document.getElementById(
+"history"
+);
+
+const card=
+document.createElement(
+"div"
+);
+
+card.className=
+"history-card";
+
+card.innerHTML=
+`
+<img src="${image}">
+<div class="class-title">${className}</div>
+<div class="time">${time}</div>
+`;
+
+history.prepend(card);
+
+localStorage.setItem(
+"historyData",
+history.innerHTML
+);
+
+}
+
+function loadHistory(){
+
+const data=
+localStorage.getItem(
+"historyData"
+);
+
+if(data){
+
+document.getElementById(
+"history"
+).innerHTML=data;
+
+}
+
+}
+
+function clearHistory(){
+
+localStorage.removeItem(
+"historyData"
+);
+
+document.getElementById(
+"history"
+).innerHTML="";
+
+}
+
+</script>
+
+</body>
+</html>
